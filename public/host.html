@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>호스트 - 도전! 골든벨</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="wrap wide">
+    <div class="brand">
+      <div class="bell">🎤</div>
+      <h1>호스트 진행 화면</h1>
+    </div>
+
+    <div class="tabs">
+      <button id="tabPlay" class="active">게임 진행</button>
+      <button id="tabEdit">문제 관리</button>
+    </div>
+
+    <!-- ===== 게임 진행 탭 ===== -->
+    <div id="playPanel">
+      <div class="card">
+        <div class="row">
+          <div class="center"><div class="muted">단계</div><div id="phaseLabel" class="big-num" style="font-size:28px;">대기</div></div>
+          <div class="center"><div class="muted">진행</div><div id="progressLabel" class="big-num" style="font-size:28px;">-</div></div>
+          <div class="center"><div class="muted">생존자</div><div id="aliveLabel" class="big-num" style="font-size:28px;">0</div></div>
+          <div class="center"><div class="muted">제출</div><div id="submitLabel" class="big-num" style="font-size:28px;">0</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>현재 문제</h3>
+        <div id="curQuestion" class="muted">게임을 시작하세요.</div>
+        <div id="curAnswer" class="pill hidden" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <button id="btnStart">▶ 게임 시작</button>
+          <button id="btnTimer" class="secondary">⏱ 타이머 시작</button>
+          <button id="btnLock" class="secondary">🔒 답안 마감</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button id="btnReveal" class="secondary">✅ 정답 공개·채점</button>
+          <button id="btnNext">➡ 다음 문제</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button id="btnRevive" class="ghost">♻ 전원 부활(패자부활전)</button>
+          <button id="btnReset" class="danger">↺ 게임 리셋</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>참가자 현황 <span class="muted" id="playerCount"></span></h3>
+        <div id="playersGrid" class="players-grid"></div>
+        <p class="muted" id="overrideHint" style="margin-top:10px;"></p>
+      </div>
+    </div>
+
+    <!-- ===== 문제 관리 탭 ===== -->
+    <div id="editPanel" class="hidden">
+      <div class="card">
+        <h3 id="formTitle">새 문제 추가</h3>
+        <input type="hidden" id="qId" />
+        <label>유형</label>
+        <select id="qType">
+          <option value="multiple">객관식 (보기 선택)</option>
+          <option value="short">주관식 (직접 입력)</option>
+        </select>
+
+        <label>문제</label>
+        <textarea id="qTextInput" placeholder="예: 생일자가 가장 좋아하는 음식은?"></textarea>
+
+        <div id="choicesBlock">
+          <label>보기 (객관식)</label>
+          <div id="choiceInputs"></div>
+          <button class="ghost" id="addChoice" type="button">+ 보기 추가</button>
+        </div>
+
+        <label>정답</label>
+        <input type="text" id="qAnswerInput" placeholder="객관식: 정답 보기 내용 / 주관식: 정답 텍스트" />
+
+        <label>제한 시간(초)</label>
+        <input type="number" id="qTimeInput" value="20" min="5" max="300" />
+
+        <div class="row" style="margin-top:14px;">
+          <button id="saveQuestion">저장</button>
+          <button id="clearForm" class="secondary">새로 작성</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>문제 목록 <span class="muted" id="qCount"></span></h3>
+        <div id="questionList" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/host.js"></script>
+</body>
+</html>

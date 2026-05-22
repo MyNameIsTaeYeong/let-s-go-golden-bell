@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대형 화면 - 도전! 골든벨</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="wrap wide">
+    <!-- 대기 -->
+    <div id="lobbyView" class="center">
+      <div class="brand">
+        <div class="bell" style="font-size:90px;">🔔</div>
+        <h1 style="font-size:48px;">도전! 골든벨</h1>
+        <div class="sub" style="font-size:20px;">생일 이벤트 실시간 퀴즈</div>
+      </div>
+      <div class="card">
+        <p style="font-size:24px;">휴대폰으로 접속해 주세요</p>
+        <p class="muted" id="joinUrl" style="font-size:20px;"></p>
+        <div class="screen-stat" id="lobbyCount">0</div>
+        <p class="muted">명 입장</p>
+      </div>
+    </div>
+
+    <!-- 문제 -->
+    <div id="questionView" class="hidden">
+      <div class="row" style="justify-content:space-between;">
+        <span class="pill" id="sProgress" style="font-size:20px;"></span>
+        <span class="pill" id="sTimer" style="font-size:20px;"></span>
+        <span class="pill" id="sAlive" style="font-size:20px;"></span>
+      </div>
+      <div class="timer-wrap" style="height:18px;"><div class="timer-bar" id="sTimerBar"></div></div>
+      <div class="card" style="margin-top:30px;">
+        <div class="screen-question" id="sQuestion"></div>
+        <div class="screen-choices" id="sChoices"></div>
+      </div>
+      <div class="center" style="margin-top:20px;">
+        <span class="screen-stat" id="sSubmitCount" style="font-size:48px;">0</span>
+        <span class="muted" style="font-size:24px;"> 명 제출</span>
+      </div>
+    </div>
+
+    <!-- 종료 -->
+    <div id="finishView" class="hidden center">
+      <div class="brand">
+        <div class="bell pop" style="font-size:120px;">🏆</div>
+        <h1 style="font-size:52px;">골든벨!</h1>
+      </div>
+      <div class="card">
+        <p style="font-size:26px;">최종 생존자</p>
+        <div id="winners" class="players-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/screen.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "lets-go-golden-bell",
+  "version": "1.0.0",
+  "description": "사내 생일 이벤트용 실시간 골든벨 퀴즈 게임",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

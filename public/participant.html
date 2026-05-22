@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>참가 - 도전! 골든벨</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="bell">🔔</div>
+      <h1>도전! 골든벨</h1>
+    </div>
+
+    <!-- 입장 폼 -->
+    <div id="joinView" class="card">
+      <h2>입장하기</h2>
+      <label for="nameInput">이름(닉네임)</label>
+      <input type="text" id="nameInput" placeholder="예: 홍길동" maxlength="20" />
+      <button class="btn-full" id="joinBtn">입장</button>
+    </div>
+
+    <!-- 게임 화면 -->
+    <div id="gameView" class="hidden">
+      <div class="card center" id="statusCard">
+        <div class="pill" id="meName"></div>
+        <div id="bannerArea" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card hidden" id="questionCard">
+        <div class="row" style="justify-content:space-between;">
+          <span class="pill" id="qProgress"></span>
+          <span class="pill" id="qTimer"></span>
+        </div>
+        <div class="timer-wrap"><div class="timer-bar" id="timerBar"></div></div>
+        <h2 id="qText" style="margin-top:10px;"></h2>
+        <div id="answerArea"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/participant.js"></script>
+</body>
+</html>
