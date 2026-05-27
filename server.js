@@ -274,6 +274,18 @@ function reviveAll() {
   broadcastPlayers();
 }
 
+function kickPlayer(token) {
+  const p = game.players.get(token);
+  if (!p) return;
+  if (p.socketId) {
+    const sock = io.sockets.sockets.get(p.socketId);
+    if (sock) sock.emit('kicked');
+  }
+  game.players.delete(token);
+  broadcastState();
+  broadcastPlayers();
+}
+
 function resetGame() {
   clearTimer();
   game.phase = 'lobby';
@@ -444,6 +456,7 @@ io.on('connection', (socket) => {
   socket.on('grade:override', ({ token, correct }) => gradeOverride(token, correct));
   socket.on('game:revive', () => reviveAll());
   socket.on('game:reset', () => resetGame());
+  socket.on('player:kick', ({ token }) => kickPlayer(token));
 
   socket.on('disconnect', () => {
     if (socket.data.role === 'participant' && socket.data.token) {

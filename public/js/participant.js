@@ -41,6 +41,13 @@ if (me.token && me.name) {
   });
 }
 
+socket.on('kicked', () => {
+  localStorage.removeItem('gb_token');
+  localStorage.removeItem('gb_name');
+  alert('호스트에 의해 게임에서 제외되었습니다.');
+  location.href = '/';
+});
+
 socket.on('state', (s) => {
   current.phase = s.phase;
   current.question = s.question;
