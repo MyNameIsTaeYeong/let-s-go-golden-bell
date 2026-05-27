@@ -120,7 +120,7 @@ function submittedCount() {
 // ---------------------------------------------------------------------------
 function broadcastState() {
   const q = currentQuestion();
-  io.emit('state', {
+  const base = {
     phase: game.phase,
     currentIndex: game.currentIndex,
     total: questions.length,
@@ -128,7 +128,17 @@ function broadcastState() {
     aliveCount: aliveCount(),
     totalPlayers: game.players.size,
     question: game.phase === 'lobby' ? null : publicQuestion(q),
-  });
+  };
+  // 참가자 소켓에는 본인 alive/submitted 정보를 함께 실어 보낸다
+  for (const [, socket] of io.sockets.sockets) {
+    const token = socket.data && socket.data.token;
+    const p = token ? game.players.get(token) : null;
+    if (p) {
+      socket.emit('state', { ...base, you: { alive: p.alive, submitted: hasSubmittedCurrent(p) } });
+    } else {
+      socket.emit('state', base);
+    }
+  }
 }
 
 function broadcastPlayers() {

@@ -63,7 +63,8 @@ socket.on('state', (s) => {
   }
 
   // 탈락자는 문제 안 보여주고 관전 안내
-  if (!me.alive) {
+  // 단, reveal 단계에서는 정답 공개를 함께 보여주기 위해 results 핸들러로 위임
+  if (!me.alive && s.phase !== 'reveal') {
     questionCard.classList.add('hidden');
     banner.innerHTML = '';
     banner.appendChild(el('div', { class: 'banner dead', text: '아쉽지만 탈락했어요 😢 대형 화면으로 관전해주세요!' }));
@@ -75,9 +76,8 @@ socket.on('state', (s) => {
 });
 
 socket.on('results', (r) => {
-  // reveal 단계: 내 정답 여부 표시
+  // reveal 단계: 내 정답 여부 표시 (방금 탈락한 경우도 정답은 봐야 함)
   if (current.phase !== 'reveal') return;
-  if (!me.alive) return; // state에서 처리됨
   const mine = r.detail.find((d) => d.token === me.token);
   const banner = $('#bannerArea');
   banner.innerHTML = '';
