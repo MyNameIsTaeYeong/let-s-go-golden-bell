@@ -298,6 +298,11 @@ io.on('connection', (socket) => {
       player.socketId = socket.id;
       if (name) player.name = String(name).slice(0, 20);
     } else {
+      // 새 입장은 대기(lobby) 단계에서만 허용
+      if (game.phase !== 'lobby') {
+        if (typeof cb === 'function') cb({ ok: false, reason: 'in-progress' });
+        return;
+      }
       const newToken = newId();
       player = {
         token: newToken,
@@ -311,7 +316,7 @@ io.on('connection', (socket) => {
     socket.data.token = player.token;
     socket.data.role = 'participant';
     if (typeof cb === 'function') {
-      cb({ token: player.token, name: player.name });
+      cb({ ok: true, token: player.token, name: player.name });
     }
     // 현재 진행 중인 문제가 있으면 바로 전송
     socket.emit('state', {

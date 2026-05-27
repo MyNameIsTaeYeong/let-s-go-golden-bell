@@ -13,7 +13,12 @@ $('#joinBtn').addEventListener('click', doJoin);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin(); });
 
 function applyJoinResult(res) {
-  if (!res || !res.token) return;
+  if (!res || !res.token) {
+    if (res && res.reason === 'in-progress') {
+      toast('이미 게임이 시작되어 입장할 수 없어요. 다음 게임을 기다려 주세요.');
+    }
+    return;
+  }
   me.token = res.token;
   me.name = res.name;
   localStorage.setItem('gb_token', me.token);
