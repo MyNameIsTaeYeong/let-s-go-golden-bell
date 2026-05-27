@@ -12,30 +12,27 @@ if (me.name) nameInput.value = me.name;
 $('#joinBtn').addEventListener('click', doJoin);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin(); });
 
+function applyJoinResult(res) {
+  if (!res || !res.token) return;
+  me.token = res.token;
+  me.name = res.name;
+  localStorage.setItem('gb_token', me.token);
+  localStorage.setItem('gb_name', me.name);
+  joinView.classList.add('hidden');
+  gameView.classList.remove('hidden');
+  $('#meName').textContent = '👤 ' + me.name;
+}
+
 function doJoin() {
   const name = nameInput.value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
-  socket.emit('join', { name, token: me.token }, (res) => {
-    me.token = res.token;
-    me.name = res.name;
-    localStorage.setItem('gb_token', me.token);
-    localStorage.setItem('gb_name', me.name);
-    joinView.classList.add('hidden');
-    gameView.classList.remove('hidden');
-    $('#meName').textContent = '👤 ' + me.name;
-  });
+  socket.emit('join', { name, token: me.token }, applyJoinResult);
 }
 
 // 새로고침 후 자동 재입장
 if (me.token && me.name) {
   socket.on('connect', () => {
-    socket.emit('join', { name: me.name, token: me.token }, (res) => {
-      me.token = res.token;
-      me.name = res.name;
-      joinView.classList.add('hidden');
-      gameView.classList.remove('hidden');
-      $('#meName').textContent = '👤 ' + me.name;
-    });
+    socket.emit('join', { name: me.name, token: me.token }, applyJoinResult);
   });
 }
 
