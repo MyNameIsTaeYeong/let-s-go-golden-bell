@@ -179,10 +179,25 @@ function startGame() {
   nextQuestion();
 }
 
+function gradeCurrent() {
+  const q = currentQuestion();
+  if (!q) return;
+  for (const p of game.players.values()) {
+    if (!p.alive) continue;
+    const a = p.answers[q.id];
+    const correct = a ? !!a.correct : false;
+    if (!correct) p.alive = false;
+  }
+}
+
 function nextQuestion() {
   clearTimer();
   const next = game.currentIndex + 1;
   if (next >= questions.length) {
+    // 마지막 문제에서 reveal을 건너뛴 채 종료되는 경우 자동 채점
+    if (game.phase === 'question' || game.phase === 'locked') {
+      gradeCurrent();
+    }
     game.phase = 'finished';
     broadcastState();
     broadcastPlayers();
@@ -219,15 +234,8 @@ function lockAnswers() {
 
 function revealAnswer() {
   clearTimer();
-  const q = currentQuestion();
-  if (!q) return;
-  // 채점: 생존자 중 오답/미응답 -> 탈락
-  for (const p of game.players.values()) {
-    if (!p.alive) continue;
-    const a = p.answers[q.id];
-    const correct = a ? !!a.correct : false;
-    if (!correct) p.alive = false;
-  }
+  if (!currentQuestion()) return;
+  gradeCurrent();
   game.phase = 'reveal';
   broadcastState();
   broadcastPlayers();
