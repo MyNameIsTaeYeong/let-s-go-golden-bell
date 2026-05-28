@@ -94,6 +94,7 @@ function playerList() {
     alive: p.alive,
     connected: !!p.socketId,
     submitted: hasSubmittedCurrent(p),
+    proxy: !!p.proxy,
   }));
 }
 
@@ -157,6 +158,7 @@ function broadcastResults() {
       alive: p.alive,
       answer: a ? a.answer : null,
       correct: a ? a.correct : false,
+      proxy: !!p.proxy,
     };
   });
   io.emit('results', {
@@ -457,6 +459,73 @@ io.on('connection', (socket) => {
   socket.on('game:revive', () => reviveAll());
   socket.on('game:reset', () => resetGame());
   socket.on('player:kick', ({ token }) => kickPlayer(token));
+
+  // 대리 참가자 추가 (호스트 전용, lobby 단계에서만 허용)
+  socket.on('host:addProxy', ({ name } = {}, cb) => {
+    if (socket.data.role !== 'host') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'forbidden' });
+      return;
+    }
+    if (game.phase !== 'lobby') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'not-lobby' });
+      return;
+    }
+    const trimmed = String(name == null ? '' : name).trim().slice(0, 20);
+    if (!trimmed) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'empty-name' });
+      return;
+    }
+    const token = newId();
+    const player = {
+      token,
+      name: trimmed,
+      alive: true,
+      socketId: null,
+      proxy: true,
+      answers: {},
+    };
+    game.players.set(token, player);
+    broadcastState();
+    broadcastPlayers();
+    if (typeof cb === 'function') cb({ ok: true, token });
+  });
+
+  // 대리 참가자 답안 대리 제출 (호스트 전용, question 단계, 1회 한정)
+  socket.on('host:proxySubmit', ({ token, questionId, answer } = {}, cb) => {
+    if (socket.data.role !== 'host') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'forbidden' });
+      return;
+    }
+    const p = token && game.players.get(token);
+    if (!p || !p.proxy) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'not-proxy' });
+      return;
+    }
+    const q = currentQuestion();
+    if (!q || q.id !== questionId) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'no-question' });
+      return;
+    }
+    if (game.phase !== 'question') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'closed' });
+      return;
+    }
+    if (!p.alive) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'eliminated' });
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(p.answers, q.id)) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'already-submitted' });
+      return;
+    }
+    p.answers[q.id] = {
+      answer: String(answer == null ? '' : answer).slice(0, 200),
+      correct: gradeAnswer(q, answer),
+    };
+    if (typeof cb === 'function') cb({ ok: true });
+    io.emit('liveCount', { submitted: submittedCount(), alive: aliveCount() });
+    broadcastPlayers();
+  });
 
   socket.on('disconnect', () => {
     if (socket.data.role === 'participant' && socket.data.token) {

@@ -338,6 +338,89 @@ button.ghost:hover { border-color: var(--samsung-blue-light); background: var(--
   opacity: 1;
   box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
 }
+
+/* 대리 참가자 추가 폼 */
+.proxy-form {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+  align-items: center;
+}
+.proxy-form input[type=text] {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.proxy-form button {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+.proxy-form.hidden { display: none !important; }
+
+/* 대리 참가자 칩 */
+.player-chip.proxy {
+  background: var(--samsung-sky);
+  border-color: rgba(33, 137, 255, 0.3);
+}
+.player-chip.proxy.dead { background: var(--surface-2); }
+.player-chip.proxy.correct {
+  background: rgba(0, 163, 108, 0.14);
+  border-color: rgba(0, 163, 108, 0.35);
+}
+.player-chip.proxy.wrong {
+  background: rgba(229, 57, 53, 0.1);
+  border-color: rgba(229, 57, 53, 0.3);
+}
+.proxy-badge {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* 인라인 대리 답안 입력 */
+.player-chip .proxy-controls {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.player-chip .proxy-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.player-chip .proxy-choice {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--samsung-blue);
+  border: 1px solid rgba(33, 137, 255, 0.35);
+  box-shadow: none;
+  letter-spacing: 0;
+}
+.player-chip .proxy-choice:hover {
+  background: var(--samsung-blue);
+  color: #ffffff;
+  border-color: var(--samsung-blue);
+  filter: none;
+  box-shadow: 0 4px 10px rgba(20, 40, 160, 0.25);
+}
+.player-chip .proxy-short {
+  display: flex;
+  gap: 4px;
+}
+.player-chip .proxy-short input {
+  flex: 1;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
 .player-chip.dead { opacity: 0.4; text-decoration: line-through; background: var(--surface-2); }
 .player-chip.correct { background: rgba(0, 163, 108, 0.14); border-color: rgba(0, 163, 108, 0.35); color: var(--ok); }
 .player-chip.wrong { background: rgba(229, 57, 53, 0.1); border-color: rgba(229, 57, 53, 0.3); color: var(--bad); }
