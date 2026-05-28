@@ -12,32 +12,41 @@ if (me.name) nameInput.value = me.name;
 $('#joinBtn').addEventListener('click', doJoin);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin(); });
 
+function applyJoinResult(res) {
+  if (!res || !res.token) {
+    if (res && res.reason === 'in-progress') {
+      toast('이미 게임이 시작되어 입장할 수 없어요. 다음 게임을 기다려 주세요.');
+    }
+    return;
+  }
+  me.token = res.token;
+  me.name = res.name;
+  localStorage.setItem('gb_token', me.token);
+  localStorage.setItem('gb_name', me.name);
+  joinView.classList.add('hidden');
+  gameView.classList.remove('hidden');
+  $('#meName').textContent = '👤 ' + me.name;
+}
+
 function doJoin() {
   const name = nameInput.value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
-  socket.emit('join', { name, token: me.token }, (res) => {
-    me.token = res.token;
-    me.name = res.name;
-    localStorage.setItem('gb_token', me.token);
-    localStorage.setItem('gb_name', me.name);
-    joinView.classList.add('hidden');
-    gameView.classList.remove('hidden');
-    $('#meName').textContent = '👤 ' + me.name;
-  });
+  socket.emit('join', { name, token: me.token }, applyJoinResult);
 }
 
 // 새로고침 후 자동 재입장
 if (me.token && me.name) {
   socket.on('connect', () => {
-    socket.emit('join', { name: me.name, token: me.token }, (res) => {
-      me.token = res.token;
-      me.name = res.name;
-      joinView.classList.add('hidden');
-      gameView.classList.remove('hidden');
-      $('#meName').textContent = '👤 ' + me.name;
-    });
+    socket.emit('join', { name: me.name, token: me.token }, applyJoinResult);
   });
 }
+
+socket.on('kicked', () => {
+  localStorage.removeItem('gb_token');
+  localStorage.removeItem('gb_name');
+  alert('호스트에 의해 게임에서 제외되었습니다.');
+  location.href = '/';
+});
 
 socket.on('state', (s) => {
   current.phase = s.phase;
@@ -66,7 +75,8 @@ socket.on('state', (s) => {
   }
 
   // 탈락자는 문제 안 보여주고 관전 안내
-  if (!me.alive) {
+  // 단, reveal 단계에서는 정답 공개를 함께 보여주기 위해 results 핸들러로 위임
+  if (!me.alive && s.phase !== 'reveal') {
     questionCard.classList.add('hidden');
     banner.innerHTML = '';
     banner.appendChild(el('div', { class: 'banner dead', text: '아쉽지만 탈락했어요 😢 대형 화면으로 관전해주세요!' }));
@@ -78,9 +88,8 @@ socket.on('state', (s) => {
 });
 
 socket.on('results', (r) => {
-  // reveal 단계: 내 정답 여부 표시
+  // reveal 단계: 내 정답 여부 표시 (방금 탈락한 경우도 정답은 봐야 함)
   if (current.phase !== 'reveal') return;
-  if (!me.alive) return; // state에서 처리됨
   const mine = r.detail.find((d) => d.token === me.token);
   const banner = $('#bannerArea');
   banner.innerHTML = '';

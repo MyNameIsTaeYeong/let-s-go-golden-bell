@@ -94,6 +94,7 @@ function playerList() {
     alive: p.alive,
     connected: !!p.socketId,
     submitted: hasSubmittedCurrent(p),
+    proxy: !!p.proxy,
   }));
 }
 
@@ -120,7 +121,7 @@ function submittedCount() {
 // ---------------------------------------------------------------------------
 function broadcastState() {
   const q = currentQuestion();
-  io.emit('state', {
+  const base = {
     phase: game.phase,
     currentIndex: game.currentIndex,
     total: questions.length,
@@ -128,7 +129,17 @@ function broadcastState() {
     aliveCount: aliveCount(),
     totalPlayers: game.players.size,
     question: game.phase === 'lobby' ? null : publicQuestion(q),
-  });
+  };
+  // 참가자 소켓에는 본인 alive/submitted 정보를 함께 실어 보낸다
+  for (const [, socket] of io.sockets.sockets) {
+    const token = socket.data && socket.data.token;
+    const p = token ? game.players.get(token) : null;
+    if (p) {
+      socket.emit('state', { ...base, you: { alive: p.alive, submitted: hasSubmittedCurrent(p) } });
+    } else {
+      socket.emit('state', base);
+    }
+  }
 }
 
 function broadcastPlayers() {
@@ -147,6 +158,7 @@ function broadcastResults() {
       alive: p.alive,
       answer: a ? a.answer : null,
       correct: a ? a.correct : false,
+      proxy: !!p.proxy,
     };
   });
   io.emit('results', {
@@ -179,10 +191,25 @@ function startGame() {
   nextQuestion();
 }
 
+function gradeCurrent() {
+  const q = currentQuestion();
+  if (!q) return;
+  for (const p of game.players.values()) {
+    if (!p.alive) continue;
+    const a = p.answers[q.id];
+    const correct = a ? !!a.correct : false;
+    if (!correct) p.alive = false;
+  }
+}
+
 function nextQuestion() {
   clearTimer();
   const next = game.currentIndex + 1;
   if (next >= questions.length) {
+    // 마지막 문제에서 reveal을 건너뛴 채 종료되는 경우 자동 채점
+    if (game.phase === 'question' || game.phase === 'locked') {
+      gradeCurrent();
+    }
     game.phase = 'finished';
     broadcastState();
     broadcastPlayers();
@@ -219,15 +246,8 @@ function lockAnswers() {
 
 function revealAnswer() {
   clearTimer();
-  const q = currentQuestion();
-  if (!q) return;
-  // 채점: 생존자 중 오답/미응답 -> 탈락
-  for (const p of game.players.values()) {
-    if (!p.alive) continue;
-    const a = p.answers[q.id];
-    const correct = a ? !!a.correct : false;
-    if (!correct) p.alive = false;
-  }
+  if (!currentQuestion()) return;
+  gradeCurrent();
   game.phase = 'reveal';
   broadcastState();
   broadcastPlayers();
@@ -256,6 +276,18 @@ function reviveAll() {
   broadcastPlayers();
 }
 
+function kickPlayer(token) {
+  const p = game.players.get(token);
+  if (!p) return;
+  if (p.socketId) {
+    const sock = io.sockets.sockets.get(p.socketId);
+    if (sock) sock.emit('kicked');
+  }
+  game.players.delete(token);
+  broadcastState();
+  broadcastPlayers();
+}
+
 function resetGame() {
   clearTimer();
   game.phase = 'lobby';
@@ -280,6 +312,11 @@ io.on('connection', (socket) => {
       player.socketId = socket.id;
       if (name) player.name = String(name).slice(0, 20);
     } else {
+      // 새 입장은 대기(lobby) 단계에서만 허용
+      if (game.phase !== 'lobby') {
+        if (typeof cb === 'function') cb({ ok: false, reason: 'in-progress' });
+        return;
+      }
       const newToken = newId();
       player = {
         token: newToken,
@@ -293,7 +330,7 @@ io.on('connection', (socket) => {
     socket.data.token = player.token;
     socket.data.role = 'participant';
     if (typeof cb === 'function') {
-      cb({ token: player.token, name: player.name });
+      cb({ ok: true, token: player.token, name: player.name });
     }
     // 현재 진행 중인 문제가 있으면 바로 전송
     socket.emit('state', {
@@ -421,6 +458,74 @@ io.on('connection', (socket) => {
   socket.on('grade:override', ({ token, correct }) => gradeOverride(token, correct));
   socket.on('game:revive', () => reviveAll());
   socket.on('game:reset', () => resetGame());
+  socket.on('player:kick', ({ token }) => kickPlayer(token));
+
+  // 대리 참가자 추가 (호스트 전용, lobby 단계에서만 허용)
+  socket.on('host:addProxy', ({ name } = {}, cb) => {
+    if (socket.data.role !== 'host') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'forbidden' });
+      return;
+    }
+    if (game.phase !== 'lobby') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'not-lobby' });
+      return;
+    }
+    const trimmed = String(name == null ? '' : name).trim().slice(0, 20);
+    if (!trimmed) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'empty-name' });
+      return;
+    }
+    const token = newId();
+    const player = {
+      token,
+      name: trimmed,
+      alive: true,
+      socketId: null,
+      proxy: true,
+      answers: {},
+    };
+    game.players.set(token, player);
+    broadcastState();
+    broadcastPlayers();
+    if (typeof cb === 'function') cb({ ok: true, token });
+  });
+
+  // 대리 참가자 답안 대리 제출 (호스트 전용, question 단계, 1회 한정)
+  socket.on('host:proxySubmit', ({ token, questionId, answer } = {}, cb) => {
+    if (socket.data.role !== 'host') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'forbidden' });
+      return;
+    }
+    const p = token && game.players.get(token);
+    if (!p || !p.proxy) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'not-proxy' });
+      return;
+    }
+    const q = currentQuestion();
+    if (!q || q.id !== questionId) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'no-question' });
+      return;
+    }
+    if (game.phase !== 'question') {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'closed' });
+      return;
+    }
+    if (!p.alive) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'eliminated' });
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(p.answers, q.id)) {
+      if (typeof cb === 'function') cb({ ok: false, reason: 'already-submitted' });
+      return;
+    }
+    p.answers[q.id] = {
+      answer: String(answer == null ? '' : answer).slice(0, 200),
+      correct: gradeAnswer(q, answer),
+    };
+    if (typeof cb === 'function') cb({ ok: true });
+    io.emit('liveCount', { submitted: submittedCount(), alive: aliveCount() });
+    broadcastPlayers();
+  });
 
   socket.on('disconnect', () => {
     if (socket.data.role === 'participant' && socket.data.token) {

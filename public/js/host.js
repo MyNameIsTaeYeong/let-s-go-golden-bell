@@ -41,6 +41,10 @@ socket.on('state', (s) => {
   }
   // 정답은 reveal 단계에서만 (results에서 채워짐)
   if (s.phase !== 'reveal') ans.classList.add('hidden');
+
+  // 대리 참가자 추가 폼은 lobby 단계에서만 노출
+  $('#proxyForm').classList.toggle('hidden', s.phase !== 'lobby');
+  $('#proxyHint').classList.toggle('hidden', s.phase !== 'lobby');
 });
 
 socket.on('liveCount', (c) => {
@@ -73,7 +77,103 @@ $('#btnNext').addEventListener('click', () => socket.emit('game:next'));
 $('#btnRevive').addEventListener('click', () => { if (confirm('탈락자 전원을 부활시킬까요?')) socket.emit('game:revive'); });
 $('#btnReset').addEventListener('click', () => { if (confirm('게임을 처음부터 다시 시작할까요?')) socket.emit('game:reset'); });
 
+// ---- 대리 참가자 추가 ----
+function addProxy() {
+  const input = $('#proxyNameInput');
+  const name = input.value.trim();
+  if (!name) { toast('이름을 입력해주세요'); input.focus(); return; }
+  socket.emit('host:addProxy', { name }, (res) => {
+    if (res && res.ok) {
+      input.value = '';
+      input.focus();
+      toast(`${name}님을 대리 참가자로 추가했어요`);
+    } else {
+      const reason = res && res.reason;
+      const msg = reason === 'not-lobby' ? '게임 시작 전(lobby)에만 추가할 수 있어요'
+        : reason === 'empty-name' ? '이름을 입력해주세요'
+        : reason === 'forbidden' ? '권한이 없어요'
+        : '추가 실패';
+      toast(msg);
+    }
+  });
+}
+$('#btnAddProxy').addEventListener('click', addProxy);
+$('#proxyNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addProxy(); });
+
+// 주관식 입력 보존용 (broadcastPlayers 재렌더로 글자가 날아가지 않도록)
+const proxyDrafts = new Map();
+
+function submitProxy(token, qid, answer) {
+  if (!answer || !String(answer).trim()) { toast('답을 입력해주세요'); return; }
+  socket.emit('host:proxySubmit', { token, questionId: qid, answer }, (res) => {
+    if (res && res.ok) {
+      proxyDrafts.delete(token);
+      toast('대리 제출 완료');
+    } else {
+      const reason = res && res.reason;
+      const msg = reason === 'already-submitted' ? '이미 제출된 답안이에요 (수정 불가)'
+        : reason === 'eliminated' ? '이미 탈락한 참가자예요'
+        : reason === 'closed' ? '제출 시간이 종료됐어요'
+        : reason === 'no-question' ? '현재 문제와 맞지 않아요'
+        : reason === 'not-proxy' ? '대리 참가자가 아니에요'
+        : reason === 'forbidden' ? '권한이 없어요'
+        : '제출 실패';
+      toast(msg);
+    }
+  });
+}
+
+function proxyAnswerControls(player, question) {
+  const box = el('div', { class: 'proxy-controls' });
+  if (question.type === 'multiple') {
+    const choicesBox = el('div', { class: 'proxy-choices' });
+    (question.choices || []).forEach((choice) => {
+      const btn = el('button', { class: 'proxy-choice', type: 'button', text: choice });
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submitProxy(player.token, question.id, choice);
+      });
+      choicesBox.appendChild(btn);
+    });
+    box.appendChild(choicesBox);
+  } else {
+    const row = el('div', { class: 'proxy-short' });
+    const input = el('input', { type: 'text', placeholder: '대리 답안', maxlength: '200' });
+    const draft = proxyDrafts.get(player.token);
+    if (draft) input.value = draft;
+    input.addEventListener('input', () => { proxyDrafts.set(player.token, input.value); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitProxy(player.token, question.id, input.value.trim()); }
+    });
+    input.addEventListener('click', (e) => e.stopPropagation());
+    const btn = el('button', { class: 'proxy-choice', type: 'button', text: '제출' });
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      submitProxy(player.token, question.id, input.value.trim());
+    });
+    row.appendChild(input);
+    row.appendChild(btn);
+    box.appendChild(row);
+  }
+  return box;
+}
+
+function proxyBadge() {
+  return el('span', { class: 'proxy-badge', text: '📝', title: '대리 참가자' });
+}
+
 // ---- 참가자 렌더 ----
+function kickButton(token, name) {
+  const btn = el('button', { class: 'kick', type: 'button', text: '✕', title: '참가자 내보내기' });
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (confirm(`${name}님을 게임에서 내보낼까요?`)) {
+      socket.emit('player:kick', { token });
+    }
+  });
+  return btn;
+}
+
 function renderPlayers(players) {
   $('#playerCount').textContent = `(${players.filter(p => p.alive).length}명 생존 / 총 ${players.length}명)`;
   // reveal 단계면 results 기준 렌더가 우선
@@ -86,11 +186,16 @@ function renderPlayers(players) {
     return;
   }
   players.forEach((p) => {
-    const chip = el('div', { class: 'player-chip' + (p.alive ? '' : ' dead') });
+    const chip = el('div', { class: 'player-chip' + (p.alive ? '' : ' dead') + (p.proxy ? ' proxy' : '') });
+    chip.appendChild(kickButton(p.token, p.name));
+    if (p.proxy) chip.appendChild(proxyBadge());
     chip.appendChild(el('div', { text: p.name }));
     const tags = [];
     if (state.phase === 'question' && p.submitted) tags.push('제출✓');
     chip.appendChild(el('div', { class: 'muted', text: tags.join(' '), style: 'font-size:12px;' }));
+    if (p.proxy && p.alive && state.phase === 'question' && !p.submitted && state.question) {
+      chip.appendChild(proxyAnswerControls(p, state.question));
+    }
     grid.appendChild(chip);
   });
 }
@@ -100,7 +205,9 @@ function renderPlayersFromResults(r) {
   grid.innerHTML = '';
   $('#overrideHint').textContent = '주관식은 채점이 애매할 수 있어요. 칩을 클릭하면 정답/오답을 직접 바꿀 수 있습니다.';
   r.detail.forEach((d) => {
-    const chip = el('div', { class: 'player-chip ' + (d.correct ? 'correct' : 'wrong') + (d.alive ? '' : ' dead') });
+    const chip = el('div', { class: 'player-chip ' + (d.correct ? 'correct' : 'wrong') + (d.alive ? '' : ' dead') + (d.proxy ? ' proxy' : '') });
+    chip.appendChild(kickButton(d.token, d.name));
+    if (d.proxy) chip.appendChild(proxyBadge());
     chip.appendChild(el('div', { text: d.name }));
     chip.appendChild(el('div', { class: 'muted', text: (d.answer ?? '(무응답)'), style: 'font-size:12px;' }));
     chip.style.cursor = 'pointer';
